@@ -1,12 +1,14 @@
 package com.torchlight.search;
 
-import java.awt.Graphics2D;
+import java.awt.AWTException;
+import java.awt.Dimension;
+import java.awt.Rectangle;
+import java.awt.Robot;
+import java.awt.Toolkit;
+import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.URL;
 
 import javax.imageio.ImageIO;
 
@@ -18,58 +20,115 @@ import org.opencv.imgproc.Imgproc;
 import net.sourceforge.tess4j.Tesseract;
 
 public class Search {
-
+	
 	static Tesseract tesseract = new Tesseract();
 	static {
 		System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 		tesseract.setDatapath("C:\\Users\\ovov9\\Downloads\\tesseract-5.2.0\\tesseract-5.2.0\\tessdata");
 	}
+	
+	static double starX = 0; 
+	static double starY = 0; 
+	static double amountX = 0; 
+	static double amountY = 0; 
+	static double priceX = 0; 
+	static double priceY = 0; 
+	
+	static double xOffset = 0;
+	static double yOffset = 0;
 	public static void main(String[] args) {
-//	      System.loadLibrary( Core.NATIVE_LIBRARY_NAME );
-//	      Mat mat = Mat.eye( 3, 3, CvType.CV_8UC1 );
-//	      System.out.println( "mat = " + mat.dump() );
-//        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-//
-//       File imgFile = new File("C:\\Users\\ovov9\\Desktop\\testJPG68.jpg");
-//       String dest = "C:/Users/ovov9/Desktop";
-//       Mat src = Imgcodecs.imread(imgFile.toString(), Imgcodecs.IMREAD_GRAYSCALE);
-//
-//       Mat dst = new Mat();
-//
-//       Imgproc.adaptiveThreshold(src, dst, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 13, 5);
-//       Imgcodecs.imwrite(dest + "/AdaptiveThreshold" + imgFile.getName(), dst);
 		Search mod = new Search();
-		Mat origin = Imgcodecs.imread("C:\\Users\\ovov9\\Desktop\\testJPG68.jpg");
-		String result = new Search().extractString(origin);
-		System.out.println(result);
+		//設定價格數字所在位置 須設定五個點位 星位、數量位、價格位、右邊一格星位，下面一格星位
+		mod.setStartPoint();
 		
-//		try {
-//			mod.splitImage();
-//		}catch(Exception e) {
-//			e.printStackTrace();
-//		}
+		// 建立 Robot、座標 物件
+		try {
+			Robot ro = new Robot();
+//			int page = 0;
+//			while(page<=20) {
+				// 以位置為中心截圖
+				double targetRatio = 33;
+				int count = 0;
+				for (int i = 1; i <= 5; i++) {
+					for (int j = 1; j <= 2; j++) {
+						count++;
+						File amountImgFile = mod.screenshot("amount" + count, amountX + xOffset * (i - 1),
+								amountY + yOffset * (j - 1));
+						File priceImgFile = mod.screenshot("price" + count, priceX + xOffset * (i - 1),
+								priceY + yOffset * (j - 1));
+						try {
+							String amountString = mod.extractString(amountImgFile);
+							String priceString = mod.extractString(priceImgFile);
+
+
+
+							Double amount = Double.valueOf(amountString);
+							Double price = Double.valueOf(priceString);
+							Double thisRatio = amount / price;
+							
+							if (thisRatio >= targetRatio) {
+								System.out.println("amount" + count + ":" + amountString);
+								System.out.println("price" + count + ":" + priceString);
+								System.out.println("thisRatio : " + thisRatio);
+								int thisStarX = (int)(starX + xOffset * (i - 1));
+								int thisStarY = (int)(starY + yOffset * (j - 1));
+//								mod.sendString(thisStarX, thisStarY);
+								ro.mouseMove(thisStarX,thisStarY);
+								ro.mousePress(InputEvent.BUTTON1_MASK);
+								ro.delay(100);
+								ro.mouseRelease(InputEvent.BUTTON1_MASK);
+							}
+						}catch(Exception e) {
+							e.printStackTrace();
+						}
+					}
+				}
+				
+				ro.mouseMove(1891,591);
+				ro.delay(100);
+				ro.mousePress(InputEvent.BUTTON1_MASK);
+				ro.delay(100);
+				ro.mouseRelease(InputEvent.BUTTON1_MASK);
+
+//			}
+//
+//			page++;
+		} catch (AWTException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		//OCR判斷數字
 		
-		
+		//比值計算與判斷
 	}
 	
 	
-	public String extractString(Mat inputMat) {
+	public String extractString(File imgFile) {
 		String result = "";
 		Mat gray = new Mat();
 		
-		File imgFile = new File("C:\\Users\\ovov9\\Desktop\\testJPG74.jpg");
-		String dest = "C:/Users/ovov9/Desktop";
-		Mat src = Imgcodecs.imread(imgFile.toString(), Imgcodecs.IMREAD_REDUCED_GRAYSCALE_2);
-
+//		File imgFile = new File("C:\\Users\\ovov9\\Desktop\\3.png");
+		String dest = imgFile.getParent();
+		
+		
+//		Mat src = Imgcodecs.imread(imgFile.toString(), Imgcodecs.IMREAD_GRAYSCALE);
+		Mat src = Imgcodecs.imread(imgFile.toString());
 		Mat dst = new Mat();
-
-		Imgproc.adaptiveThreshold(src, dst, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 13, 5);
-		String destPath = dest +"/AdaptiveThreshold" + imgFile.getName();
+		Imgproc.cvtColor(src, dst, Imgproc.COLOR_RGB2GRAY);
+		
+		String destPath = dest +"/metadata" + imgFile.getName();
 		Imgcodecs.imwrite(destPath, dst);
+		
+//		Mat src2 = Imgcodecs.imread(destPath.toString(), Imgcodecs.IMREAD_GRAYSCALE);
+//		Imgproc.adaptiveThreshold(src2, dst, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 13, 5);
+//
+//		String destPath2 = dest +"/metadata2" + imgFile.getName();
+//		Imgcodecs.imwrite(destPath2, dst);
 		
 		File imgThresholdFile = new File(destPath);
 		
 		try {
+			tesseract.setLanguage("digits");
 			result = tesseract.doOCR(imgThresholdFile);
 		}catch(Exception e) {
 			e.printStackTrace();
@@ -77,62 +136,46 @@ public class Search {
 		return result;
 	}
 	
-	public void splitImage() throws IOException {
-        // Setting Chrome as an agent
-        System.setProperty("http.agent", "Chrome");
-
-        // reading the original image file
-        // File file = new File("https://www.educative.io/api/edpresso/shot/5120209133764608/image/5075298506244096/test.jpg");
-        // FileInputStream sourceFile = new FileInputStream(file);
-        
-        // reading the file from a URL
-        URL url = new URL("https://www.educative.io/api/edpresso/shot/5120209133764608/image/5075298506244096/test.jpg");
-        InputStream is = url.openStream();
-        BufferedImage image = ImageIO.read(is);
-
-        // initalizing rows and columns
-        int rows = 4;
-        int columns = 4;
-
-        // initializing array to hold subimages
-        BufferedImage imgs[] = new BufferedImage[16];
-
-        // Equally dividing original image into subimages
-        int subimage_Width = image.getWidth() / columns;
-        int subimage_Height = image.getHeight() / rows;
-        
-        int current_img = 0;
-        
-        // iterating over rows and columns for each sub-image
-        for (int i = 0; i < rows; i++)
-        {
-            for (int j = 0; j < columns; j++)
-            {
-                // Creating sub image
-                imgs[current_img] = new BufferedImage(subimage_Width, subimage_Height, image.getType());
-                Graphics2D img_creator = imgs[current_img].createGraphics();
-
-                // coordinates of source image
-                int src_first_x = subimage_Width * j;
-                int src_first_y = subimage_Height * i;
-
-                // coordinates of sub-image
-                int dst_corner_x = subimage_Width * j + subimage_Width;
-                int dst_corner_y = subimage_Height * i + subimage_Height;
-                
-                img_creator.drawImage(image, 0, 0, subimage_Width, subimage_Height, src_first_x, src_first_y, dst_corner_x, dst_corner_y, null);
-                current_img++;
-            }
-        }
-
-        //writing sub-images into image files
-        for (int i = 0; i < 16; i++)
-        {
-            File outputFile = new File("img" + i + ".jpg");
-            ImageIO.write(imgs[i], "jpg", outputFile);
-        }
-        System.out.println("Sub-images have been created.");
-    }
+	public File screenshot(String name, double x, double y) {
+		File f = new File("image/"+name+".jpg");
+		try {
+			double xoffset = 30;
+			double yoffset = 17;
+			int x0 = (int)(x-xoffset);
+			int y0 = (int)(y-yoffset);
+			
+			Toolkit tk = Toolkit.getDefaultToolkit();
+			Dimension d = tk.getScreenSize();
+			Rectangle rec = new Rectangle(x0,y0,(int)xoffset*2,(int)yoffset*2);
+			Robot ro = new Robot();
+			BufferedImage img = ro.createScreenCapture(rec);
+//			File f = new File("image/"+name+".jpg");// set appropriate path
+			ImageIO.write(img, "jpg", f);
+			
+		} catch (Exception ex) {
+			System.out.println(ex.getMessage());
+		}
+		return f;
+	}
 	
+	public void setStartPoint() {
+		starX = 218.0;
+		starY = 321.0;
+		amountX = 418; 
+		amountY = 326; 
+		priceX = 359; 
+		priceY = 545; 
+			
+		xOffset = 534-218; 
+		yOffset = 637-321;
+	}
 	
+//	public void sendString(int x, int y) throws IOException, InterruptedException {
+//		Runtime runtime = Runtime.getRuntime();
+//	    String ahkPath = "C:\\Program Files\\AutoHotkey\\AutoHotkey.exe";
+//	    String scriptPath = "C:\\Users\\ovov9\\Desktop\\ahk\\吃參數按左鍵.ahk";
+//	    runtime.exec(new String[] {ahkPath, scriptPath, String.valueOf(x), String.valueOf(y)} );
+//	    Thread.currentThread();
+//	    Thread.sleep(1000);
+//	}
 }
